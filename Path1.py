@@ -7,13 +7,23 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 
+# Lower left and upper right coordinate pairs for map boundaries.
 map_size = [(0.0,0.0),(20.0,20.0)]
-
+# Position of starting location
 start_pos = (0.0,0.0)
-
+# Position of goal location
 goal_pos = (19.0,1.0)
 
 def get_obs(bounds, num, goal):
+    '''
+    Generates a random map of obstacles for the map provided.
+
+    Inputs:
+    bounds: Lower left and upper right coordinate pairs [(xmin, ymin), (xmax, ymax)] as tuples
+        map boundaries
+    num: (integer) number of obstacles to generate
+    goal: (xgoal, ygoal) goal location that cannot have an obstacle over it
+    '''
     obs_list = []
     boundMin_x = bounds[0][0]
     boundMin_y = bounds[0][1]
@@ -180,9 +190,6 @@ class PATHFIND:
             for obs in PATHFIND.map_obs:
                 if obs[0][0] <= x_val <= obs[1][0] and obs[0][1] <= y_val <= obs[1][1]:
                     print 'valid_check : ({:1.2f},{:1.2f}) collision with obstacle at [({:1.2f},{:1.2f}),({:1.2f},{:1.2f})]'.format(x_val, y_val, obs[0][0], obs[0][1], obs[1][0], obs[1][1])
-                    # in_cmd = raw_input('valid_check : ({:1.2f},{:1.2f}) collision with obstacle at [({:1.2f},{:1.2f}),({:1.2f},{:1.2f})]'.format(x_val, y_val, obs[0][0], obs[0][1], obs[1][0], obs[1][1]))
-                    # if in_cmd == 's':
-                    #     exit()
                     return False
             return True
         else:
@@ -219,15 +226,26 @@ class PATHFIND:
     
     @classmethod
     def set_goal(cls, coords):
+        '''
+        This scheme does not need to have an established node at the end location,
+        the end goal locaiton just needs to be stored in the class.
+        '''
         cls.end_goal = coords
 
     @classmethod
     def set_start(cls, coords):
+        '''
+        Sets start position and establishes a node at the origin.
+        '''
         cls.start_loc = coords
         cls(coords[0],coords[1], start=True)
 
     @classmethod
     def draw_map(cls, title='Untitled'):
+        '''
+        Draws border, obstacles, start node, end node, and intermediate nodes onto the plotting space.
+        Depends on the draw_border(), draw_obstacles(), and draw_circ() functions.
+        '''
         cls.fig, cls.ax = plt.subplots()
         cls.draw_border()
         cls.draw_obstacles()
@@ -252,6 +270,10 @@ class PATHFIND:
 
     @classmethod
     def draw_border(cls):
+        '''
+        Creates a border that outlines the total valid points in the map space
+        - This is a sub-function called by the draw_map() function
+        '''
         box_color = '#555555'
         ln_width = 3
         cls.ax.plot([cls.x_min, cls.x_max],[cls.y_min, cls.y_min], color=box_color, linewidth=ln_width)
@@ -261,6 +283,10 @@ class PATHFIND:
 
     @classmethod
     def draw_obstacles(cls):
+        '''
+        Draws the obstacle blocks in the plotting space
+        - This is a sub-function called by the draw_map() function
+        '''
         boxes = []
         face_color = '#555555'
         for block in cls.map_obs:
@@ -277,6 +303,10 @@ class PATHFIND:
     
     @classmethod
     def draw_circ(cls, coords, rad=0.1, cir_color='b'):
+        '''
+        Adds a circle to the plotting space
+        - This is a sub-function called by the new_node() function
+        '''
         circ = [mpatches.Circle(coords, radius=rad)]
         pc = PatchCollection(circ, facecolor=cir_color, edgecolor='None')
         cls.ax.add_collection(pc)
@@ -284,22 +314,35 @@ class PATHFIND:
     @classmethod
     def run_RRT(cls, step_size, animate=False):
         print '~~~~~~~~~~~~~~~~~~~~~~~~~  RUN_RRT CALLED~~~~~~~~~~~~~~~~~~~~~~'
+        # Set plot space header while we are trying to find this path
         cls.draw_map('Processing RRT...')
         while cls.nearest_node(cls.end_goal)[1][0] > step_size:
+            # Run this loop while the nearest node to the goal node is larger than the step size
+            # Generate a random point
             rand_point = (random.uniform(cls.x_min, cls.x_max), random.uniform(cls.y_min, cls.y_max))
+            # Find the nearest node to this generated point
+            # Yields node index, distance and angle(radians)
             near_node = cls.nearest_node(rand_point)
-            if cls.map_nodes[near_node[0]].valid_check(rand_point[0], rand_point[1]):
-                # cls.draw_map()
-                cls.new_node(near_node, step_size, animate)
+            # Generates a new node (if valid) at the new estimated location
+            cls.new_node(near_node, step_size, animate)
+        # Get the node number of the nearest node to the end goal
         current_node_index = cls.nearest_node(cls.end_goal)[0]
+        # Create a node object from this nearest node
         current_node = cls.map_nodes[current_node_index]
+        # The goal here is to build a list of node locations that make up our path to the goal
+        # The first value should be the end node, or else plotting looks weird
+        # Also, the robot which follows this path will stop one node short of the goal without this.
         cls.best_path.append(cls.end_goal)
+        # Now we are going to work backwards from the goal node to the start
+        # This uses the parent nodes for each node to append to the list
         while current_node.start_node == False:
             cls.best_path.append(current_node.coordinates)
             current_node = cls.map_nodes[current_node.parent]
+        # We still need to add the start node coordinates so the plotting system works.
+        # This is also to get the robot to find the first generated node from the start.
         cls.best_path.append(current_node.coordinates)
-        print cls.best_path
-        plt.show()
+        # print cls.best_path
+        # plt.show()
         return cls.best_path[::-1]
     
     @classmethod
@@ -347,15 +390,23 @@ class PATHFIND:
         '''
         Establishes a new node at a distance of a given step size
         
+        Input:
         nearest : (Node_num, (distance, radian_angle))
+            Returned format and values from the nearest_node classmethod
+        stp_sz : Distance to attempt to establish a new node from
         '''
+        # Establish node object as basis for new node generation
         anchor = cls.map_nodes[nearest[0]]
+        # Creates new x,y location from the values generated from the nearest node function
         x_new = anchor.xloc + stp_sz*math.cos(nearest[1][1])
         y_new = anchor.yloc + stp_sz*math.sin(nearest[1][1])
+        # Check for validity of a new point
         if anchor.valid_check(x_new, y_new):
+            # Create a new node at the valid location
             cls(x_new, y_new, parent=nearest[0])
+            # Draw the new animated circle and pause
             if animate:
-                cls.draw_circ((x_new, y_new), cir_color='#00CCCC')
+                cls.draw_circ((x_new, y_new), cir_color='#CCCCCC')
                 plt.pause(0.05)
         
 
