@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-## module rrt_search
+## module pathfinding
 import os, csv, math, datetime, random, time
 import numpy as np 
 import matplotlib.pyplot as plt 
