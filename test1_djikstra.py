@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-## module djikstra
+
 import rospy, time, csv, os, datetime, math
 from beginner_tutorials.msg import Position
 from nav_msgs.msg import Odometry
